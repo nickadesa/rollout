@@ -103,6 +103,7 @@ export class UIManager {
 
         <div class="hud-topright">
           <div class="hud-top-actions">
+            <button id="btn-hud-fullscreen" class="hud-mini-btn font-display" title="Toggle Fullscreen">⛶ FULL</button>
             <button id="btn-hud-settings" class="hud-mini-btn font-display">⚙ SETTINGS</button>
             <button id="btn-hud-pause" class="hud-mini-btn font-display">❚❚ PAUSE</button>
           </div>
@@ -230,6 +231,14 @@ export class UIManager {
         this.engine.selectWeapon(wid as keyof typeof WEAPONS);
       });
     });
+
+    this.root.querySelector('#btn-hud-fullscreen')!.addEventListener('click', () => {
+      this.engine.audio.unlock();
+      this.engine.audio.playUiClick();
+      this.toggleFullscreen();
+    });
+    document.addEventListener('fullscreenchange', () => this.syncFullscreenButtons());
+    document.addEventListener('webkitfullscreenchange', () => this.syncFullscreenButtons());
 
     this.root.querySelector('#btn-hud-pause')!.addEventListener('click', () => this.engine.pause());
     this.root.querySelector('#btn-hud-settings')!.addEventListener('click', () => {
@@ -419,6 +428,7 @@ export class UIManager {
           <button class="nav-tab font-display ${!isLocker ? 'active' : ''}" data-tab="play">PLAY</button>
           <button class="nav-tab font-display ${isLocker ? 'active' : ''}" data-tab="locker">LOCKER</button>
           <button class="nav-tab font-display" id="btn-lobby-settings">SETTINGS</button>
+          <button class="nav-tab font-display" id="btn-lobby-fullscreen" title="Toggle Fullscreen">${this.isFullscreen() ? '✕ EXIT' : '⛶ FULL'}</button>
         </div>
       </div>
 
@@ -532,6 +542,12 @@ export class UIManager {
       this.engine.audio.unlock();
       this.engine.audio.playUiClick();
       this.openSettings();
+    });
+
+    this.lobbyEl.querySelector('#btn-lobby-fullscreen')!.addEventListener('click', () => {
+      this.engine.audio.unlock();
+      this.engine.audio.playUiClick();
+      this.toggleFullscreen();
     });
 
     this.lobbyEl.querySelectorAll<HTMLElement>('.mode-btn').forEach((btn) => {
@@ -1034,5 +1050,33 @@ export class UIManager {
     el.style.color = evt.isHeadshot ? '#facc15' : evt.isShield ? '#38bdf8' : '#ffffff';
     this.hudEl.appendChild(el);
     window.setTimeout(() => el.remove(), 660);
+  }
+
+  private isFullscreen(): boolean {
+    const doc = document as Document & { webkitFullscreenElement?: Element };
+    return Boolean(document.fullscreenElement || doc.webkitFullscreenElement);
+  }
+
+  private toggleFullscreen(): void {
+    const doc = document as Document & {
+      webkitFullscreenElement?: Element;
+      webkitExitFullscreen?: () => Promise<void>;
+    };
+    const rootEl = document.documentElement as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void>;
+    };
+    if (this.isFullscreen()) {
+      (document.exitFullscreen?.() ?? doc.webkitExitFullscreen?.())?.catch?.(() => {});
+    } else {
+      (rootEl.requestFullscreen?.() ?? rootEl.webkitRequestFullscreen?.())?.catch?.(() => {});
+    }
+  }
+
+  private syncFullscreenButtons(): void {
+    const label = this.isFullscreen() ? '✕ EXIT' : '⛶ FULL';
+    const hudBtn = this.root.querySelector('#btn-hud-fullscreen');
+    const lobbyBtn = this.root.querySelector('#btn-lobby-fullscreen');
+    if (hudBtn) hudBtn.textContent = label;
+    if (lobbyBtn) lobbyBtn.textContent = label;
   }
 }

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader, GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { CHARACTER_OUTFITS, WeaponId } from '../types';
 
 export interface LoadedCharacterTemplate {
@@ -14,6 +15,10 @@ export class AssetManager {
   private characterCache: Map<string, THREE.Group> = new Map();
   private propCache: Map<string, THREE.Group> = new Map();
   private weaponCache: Map<WeaponId, THREE.Group> = new Map();
+
+  constructor() {
+    this.loader.setMeshoptDecoder(MeshoptDecoder);
+  }
 
   public async preloadCore(onProgress?: (pct: number, label: string) => void): Promise<void> {
     const coreProps = [
@@ -59,16 +64,22 @@ export class AssetManager {
     }
     step('Animations');
 
-    // 2. Real 3D Weapon GLB models
+    // 2. Real 3D Weapon GLB models (guarded so no single model ever stalls startup)
     await Promise.all([
-      this.loadWeaponModel('pistol', './assets/weapons/blaster-pistol.glb').then(() => step('Pistol')),
-      this.loadWeaponModel('knife', './assets/weapons/knife.glb').then(() => step('Knife')),
-      this.loadWeaponModel('bat', './assets/weapons/bat.glb').then(() => step('Street Bat')),
+      this.loadWeaponModel('pistol', './assets/weapons/blaster-pistol.glb')
+        .catch((e) => console.warn('Pistol load warn:', e))
+        .finally(() => step('Pistol')),
+      this.loadWeaponModel('knife', './assets/weapons/knife.glb')
+        .catch((e) => console.warn('Knife load warn:', e))
+        .finally(() => step('Knife')),
+      this.loadWeaponModel('bat', './assets/weapons/bat.glb')
+        .catch((e) => console.warn('Bat load warn:', e))
+        .finally(() => step('Street Bat')),
     ]);
 
-    // 3. Arena Props (in parallel batches of 6 for mobile stability)
-    for (let i = 0; i < coreProps.length; i += 6) {
-      const batch = coreProps.slice(i, i + 6);
+    // 3. Arena Props (in parallel batches of 12 for fast loading)
+    for (let i = 0; i < coreProps.length; i += 12) {
+      const batch = coreProps.slice(i, i + 12);
       await Promise.all(
         batch.map(async (name) => {
           try {
